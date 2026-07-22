@@ -368,9 +368,12 @@ The script runs the following step:
 3. Merge labels from the visual areas of interest into a single label file for further analysis.
 4. Run the pRF fitting again on the manually delineated visual area labels.
 
-For the statistical analysis use the cflaminar/pRFM_analysis.Rmd
+### Statistical analysis of the Population Receptive Field mapping
+
+pRFM_preproc.ipynb loads the pRF fitting results for each subject, filters the vertices based on eccentricity range, variance explained, and minimum pRF size, and fits bootstrapped trendlines of pRF size as a function of eccentricity per visual area. It exports a per-vertex CSV and an Excel file with per-subject summary statistics, which are used as input for the statistical analysis.
+
+The R Markdown file takes those two files as input and runs the statistical analysis using a linear mixed-effects model with pRF size as outcome, group, eccentricity, and visual area as predictors, and subject as random effect. Post-hoc group comparisons per visual area are computed using estimated marginal means with Bonferroni correction. It also runs Spearman correlations between pRF size in V4 and LO and clinical measures (HFA and OCT).
 
 ## Contributing
-
 
 This repository is licensed under the MIT License.
