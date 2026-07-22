@@ -363,10 +363,12 @@ subject_id="sub-$input"
 
 The script runs the following step:
 
-1. Fit population receptive fields on the preprocessed functional data projected onto the GM surface (`fit_pRFs.py`). The script takes the subject ID, tissue type (GM), and task name (RET) as inputs. The visual area labels are derived from the Benson atlas.
-2. Merge labels from the visual areas of interest into a single label file for further analysis.
-3. Run the pRF fitting again on the manually delineated visual area labels.
+1. Fit population receptive fields on the preprocessed functional data (`fit_pRFs.py`). The script takes the subject ID, tissue type (GM), and task name (RET) as inputs. The visual area labels are derived from the Benson atlas.
+3. Manually delineate the visual areas using Freeview. The inflated surfaces are opened with the polar angle, eccentricity, and R² maps as overlays. Color scales for each overlay are stored in `pRF_fitting/colorscales/`. This step runs locally, not on the cluster.
+3. Merge labels from the visual areas of interest into a single label file for further analysis.
+4. Run the pRF fitting again on the manually delineated visual area labels.
 
+For the statistical analysis use the cflaminar/pRFM_analysis.Rmd
 
 ## Contributing
 
