@@ -1,0 +1,140 @@
+<svg viewBox="0 0 1200 510" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="white"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="510" fill="#3c3c3c"/>
+
+  <!-- ===== BIDSIFYING entry box ===== -->
+  <rect x="22" y="105" width="140" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="92" y="136" fill="white" font-size="13" font-weight="bold" text-anchor="middle">BIDSIFYING</text>
+  <text x="92" y="155" fill="#888888" font-size="10" text-anchor="middle">Raw Data (DICOM)</text>
+
+  <!-- Arrow: BIDSifying to first anat box -->
+  <line x1="162" y1="141" x2="178" y2="141" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Vertical stem down to functional track level -->
+  <line x1="92" y1="177" x2="92" y2="258" stroke="white" stroke-width="1.5"/>
+  <!-- Arrow branch to functional track -->
+  <line x1="92" y1="258" x2="178" y2="258" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ===== ANATOMICAL PIPELINE ===== -->
+  <text x="585" y="97" fill="white" font-size="15" font-weight="bold" text-anchor="middle">Anatomical pipeline</text>
+
+  <!-- A1: DENOISING -->
+  <rect x="180" y="105" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="255" y="136" fill="white" font-size="13" font-weight="bold" text-anchor="middle">DENOISING</text>
+  <text x="255" y="155" fill="#888888" font-size="11" text-anchor="middle">SPM12 · CAT12</text>
+  <line x1="330" y1="141" x2="343" y2="141" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- A2: SURFACE RECONSTRUCTION -->
+  <rect x="345" y="105" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="420" y="131" fill="white" font-size="12" font-weight="bold" text-anchor="middle">SURFACE</text>
+  <text x="420" y="147" fill="white" font-size="12" font-weight="bold" text-anchor="middle">RECONSTRUCTION</text>
+  <text x="420" y="165" fill="#888888" font-size="10" text-anchor="middle">FreeSurfer</text>
+  <line x1="495" y1="141" x2="508" y2="141" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- A3: fMRIPREP -->
+  <rect x="510" y="105" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="585" y="136" fill="white" font-size="13" font-weight="bold" text-anchor="middle">fMRIPREP</text>
+  <text x="585" y="155" fill="#888888" font-size="11" text-anchor="middle">distortion corr.</text>
+  <line x1="660" y1="141" x2="673" y2="141" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- A4: BENSON ATLAS -->
+  <rect x="675" y="105" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="750" y="136" fill="white" font-size="13" font-weight="bold" text-anchor="middle">BENSON ATLAS</text>
+  <text x="750" y="155" fill="#888888" font-size="11" text-anchor="middle">neuropythy</text>
+  <line x1="825" y1="141" x2="838" y2="141" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- A5: PYCORTEX -->
+  <rect x="840" y="105" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="915" y="136" fill="white" font-size="13" font-weight="bold" text-anchor="middle">PYCORTEX</text>
+  <text x="915" y="155" fill="#888888" font-size="11" text-anchor="middle">setup</text>
+
+  <!-- ===== FUNCTIONAL PIPELINE ===== -->
+  <text x="585" y="210" fill="white" font-size="15" font-weight="bold" text-anchor="middle">Functional pipeline</text>
+  <text x="585" y="226" fill="#aaaaaa" font-size="12" text-anchor="middle">bold (RET, RS)</text>
+
+  <!-- F1: DENOISING -->
+  <rect x="180" y="232" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="255" y="263" fill="white" font-size="13" font-weight="bold" text-anchor="middle">DENOISING</text>
+  <text x="255" y="282" fill="#888888" font-size="11" text-anchor="middle">NORDIC</text>
+  <line x1="330" y1="268" x2="343" y2="268" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- F2: MOTION CORRECTION -->
+  <rect x="345" y="232" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="420" y="258" fill="white" font-size="12" font-weight="bold" text-anchor="middle">MOTION</text>
+  <text x="420" y="274" fill="white" font-size="12" font-weight="bold" text-anchor="middle">CORRECTION</text>
+  <text x="420" y="292" fill="#888888" font-size="11" text-anchor="middle">SPM</text>
+  <line x1="495" y1="268" x2="508" y2="268" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- F3: COREGISTRATION -->
+  <rect x="510" y="232" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="585" y="258" fill="white" font-size="12" font-weight="bold" text-anchor="middle">COREGISTRATION</text>
+  <text x="585" y="277" fill="#888888" font-size="11" text-anchor="middle">ANTs</text>
+  <line x1="660" y1="268" x2="673" y2="268" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- F4: RESAMPLING -->
+  <rect x="675" y="232" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="750" y="263" fill="white" font-size="13" font-weight="bold" text-anchor="middle">RESAMPLING</text>
+  <text x="750" y="282" fill="#888888" font-size="11" text-anchor="middle">FreeSurfer</text>
+  <line x1="825" y1="268" x2="838" y2="268" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- F5: FILTERING -->
+  <rect x="840" y="232" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="915" y="263" fill="white" font-size="13" font-weight="bold" text-anchor="middle">FILTERING</text>
+  <text x="915" y="282" fill="#888888" font-size="11" text-anchor="middle">cflaminar</text>
+
+  <!-- ===== CONNECTION: both tracks → row 3 ===== -->
+  <line x1="990" y1="141" x2="1030" y2="141" stroke="white" stroke-width="1.5"/>
+  <line x1="990" y1="268" x2="1030" y2="268" stroke="white" stroke-width="1.5"/>
+  <line x1="1030" y1="141" x2="1030" y2="268" stroke="white" stroke-width="1.5"/>
+  <line x1="1030" y1="204" x2="1030" y2="348" stroke="white" stroke-width="1.5"/>
+  <line x1="1030" y1="348" x2="255" y2="348" stroke="white" stroke-width="1.5"/>
+  <line x1="255" y1="348" x2="255" y2="373" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ===== ROW 3 LABELS ===== -->
+  <text x="420" y="368" fill="white" font-size="15" font-weight="bold" text-anchor="middle">pRF Analysis</text>
+  <text x="832" y="368" fill="white" font-size="15" font-weight="bold" text-anchor="middle">Statistical Analysis</text>
+
+  <!-- Dashed divider between pRF and Stats sections -->
+  <line x1="665" y1="358" x2="665" y2="472" stroke="#666666" stroke-width="1" stroke-dasharray="5,3"/>
+
+  <!-- P1: INITIAL pRF FITTING -->
+  <rect x="180" y="375" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="255" y="400" fill="white" font-size="12" font-weight="bold" text-anchor="middle">INITIAL pRF</text>
+  <text x="255" y="416" fill="white" font-size="12" font-weight="bold" text-anchor="middle">FITTING</text>
+  <text x="255" y="434" fill="#888888" font-size="10" text-anchor="middle">pRFpy · Benson labels</text>
+  <line x1="330" y1="411" x2="343" y2="411" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- P2: MANUAL DELINEATION -->
+  <rect x="345" y="375" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="420" y="400" fill="white" font-size="12" font-weight="bold" text-anchor="middle">MANUAL</text>
+  <text x="420" y="416" fill="white" font-size="12" font-weight="bold" text-anchor="middle">DELINEATION</text>
+  <text x="420" y="434" fill="#888888" font-size="10" text-anchor="middle">Freeview</text>
+  <line x1="495" y1="411" x2="508" y2="411" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- P3: FINAL pRF FITTING -->
+  <rect x="510" y="375" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="585" y="400" fill="white" font-size="12" font-weight="bold" text-anchor="middle">FINAL pRF</text>
+  <text x="585" y="416" fill="white" font-size="12" font-weight="bold" text-anchor="middle">FITTING</text>
+  <text x="585" y="434" fill="#888888" font-size="10" text-anchor="middle">pRFpy · manual labels</text>
+  <line x1="660" y1="411" x2="673" y2="411" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- S1: VERTEX PREPROCESSING -->
+  <rect x="675" y="375" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="750" y="400" fill="white" font-size="12" font-weight="bold" text-anchor="middle">VERTEX</text>
+  <text x="750" y="416" fill="white" font-size="12" font-weight="bold" text-anchor="middle">PREPROCESSING</text>
+  <text x="750" y="434" fill="#888888" font-size="10" text-anchor="middle">Python · Jupyter</text>
+  <line x1="825" y1="411" x2="838" y2="411" stroke="white" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- S2: STATISTICAL MODELING -->
+  <rect x="840" y="375" width="150" height="72" rx="5" fill="#1a1a1a"/>
+  <text x="915" y="400" fill="white" font-size="12" font-weight="bold" text-anchor="middle">STATISTICAL</text>
+  <text x="915" y="416" fill="white" font-size="12" font-weight="bold" text-anchor="middle">MODELING</text>
+  <text x="915" y="434" fill="#888888" font-size="10" text-anchor="middle">R · lme4</text>
+
+</svg>
