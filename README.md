@@ -286,24 +286,89 @@ export PROJECT="YOUR_PROJECT_NAME"
 export TASK_SES1=("YOUR_TASK_NAMES") # if you have multiple tasks: ("task1" "task2") NO COMMA!!
 ```
 
-### The CFLaminar Repository Installation
+### The preprocessing pipeline
 
+Insde the CFLaminar repository you fill find the preprocessing scripts used in this pipeline, including the Benson atlas projection, pycortex setup, motion correction, coregistration, resampling, and filtering.
 
+Clone the cflaminar repository into your programs folder and make the shell scripts executable
+```python
+cd /home2/pxxxxxx/programs
+git clone https://github.com/FedericaCardillo1999/cflaminar.git
+chmod -R 775 /home2/pxxxxxx/programs/cflaminar/shell
+```
+The preprocessing pipeline is executed via `preprocessing.sh`, which runs all anatomical and functional steps sequentially for one subject. For the first suject I recomment running each step separately for data quality checks. 
+Before running it, set the `--time`, `SUBJECTS_DIR`, `task`, `project`, `nruns`, and `session` variables inside the script to match the BIDS directory.
 
-## Usage
+To run the pipeline for a single subject:
 
-Refer to the respective README file for specific instructions on how to use each tool.
+```bash
+sbatch preprocessing.sh sub-01
+```
+
+To run it in parallel across all subjects, navigate to the project directory and use:
+
+```bash
+cd /scratch/hb-EGRET-AAA/projects/UMCG
+for_each sub-* : sbatch --output /scratch/hb-EGRET-AAA/projects/UMCG/preprocessing/UMCG_IN.out /scratch/hb-EGRET-AAA/preprocessing.sh IN
+```
+
+When running in parallel, you have to uncomment the following lines at the top of `preprocessing.sh`:
+
+```bash
+input="$1"
+input="${input#sub-}"
+subject_id="sub-$input"
+```
+
+The pipeline runs the following steps:
+
+**A. Anatomical preprocessing**
+1. Denoise anatomical images (`master -m 08`)
+2. Reconstruct the cortical surface with FreeSurfer (`master -m 14`)
+3. Apply the Benson atlas (`standard_benson.sh`). Optionally, use the Bayesian Benson atlas if pRF mapping has already been run (`bayesian_benson.sh`)
+4. Set up the pycortex subject database (`pycortex.py`)
+5. Run fMRIprep for distortion correction (`fmriprep.py`)
+
+**B. Functional preprocessing**
+
+6. Denoise functional data using NORDIC (`master -m 10`)
+7. Apply motion correction using SPM (`moco.sh`)
+8. Apply coregistration using ANTs (`coregistration.sh`)
+9. Resample functional data to the cortical surface using FreeSurfer (`resampling.sh`)
+10. Apply bandpass filtering (`filtering.py`)
+
+### Running the Population Receptive Field mapping
+The pRF mapping is perfromed via `pRF_mapping.sh`, which runs the population receptive field fitting on the preprocessed functional data. Before running it, set the `--time` and `SUBJECTS_DIR` variables inside the script to match your data.
+
+To run it for a single subject:
+
+```bash
+sbatch pRF_mapping.sh sub-01
+```
+
+To run it in parallel across all subjects:
+
+```bash
+cd /scratch/hb-EGRET-AAA/projects/UMCG
+for_each sub-* : sbatch --output /scratch/hb-EGRET-AAA/projects/UMCG/preprocessing/pRF_mapping_UMCG_IN.out /scratch/hb-EGRET-AAA/pRF_mapping.sh IN
+```
+
+Similarly to the preprocessing script, uncomment the following lines at the top of `pRF_mapping.sh` to parallelize the subjects:
+
+```bash
+input="$1"
+input="${input#sub-}"
+subject_id="sub-$input"
+```
+
+The script runs the following step:
+
+1. Fit population receptive fields on the preprocessed functional data projected onto the GM surface (`fit_pRFs.py`). The script takes the subject ID, tissue type (GM), and task name (RET) as inputs. The visual area labels are derived from the Benson atlas.
+2. Merge labels from the visual areas of interest into a single label file for further analysis.
+3. Run the pRF fitting again on the manually delineated visual area labels.
+
 
 ## Contributing
 
-Contributions are welcome! If you have any ideas for new preprocessing scripts/tools or improvements to existing ones, feel free to open an issue or submit a pull request.
-
-Please adhere to the following guidelines when contributing:
-
-Follow the existing coding style and conventions.
-Ensure any new code is well-documented.
-Test your changes thoroughly.
-
-## License
 
 This repository is licensed under the MIT License.
