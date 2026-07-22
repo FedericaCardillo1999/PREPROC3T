@@ -1,0 +1,515 @@
+---
+title: "Population Receptive Field size analysis"
+author: "Federica Cardillo - EGRET+ Glaucoma dataset"
+date: "`18/05/2026`"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)  
+library(readxl)  
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(dplyr)
+```
+
+# Load the data from the excel file. 
+```{r}
+directory_trend   <- "/Volumes/FedericaCardillo 1/UMCG/derivatives/analysis/pRFM/trendlines"
+filename_trend <- "pRFM_Trendlines_manual_noecc.xlsx"
+
+directory_vert   <- "/Volumes/FedericaCardillo 1/UMCG/derivatives/analysis/pRFM/trendlines"
+filename_vert    <- "vertices_manual_0_7.csv"
+
+data_trend <- read_excel(file.path(directory_trend, filename_trend))
+names(data_trend) <- gsub(" ", ".", names(data_trend))
+data_vert <- read_csv(file.path(directory_vert, filename_vert), show_col_types = FALSE)
+names(data_vert) <- gsub(" ", ".", names(data_vert))
+
+data_vert <- data_vert %>% filter(Eccentricity >= 0.5, Eccentricity <= 6.5, Variance.Explained >= 0.1)
+
+subject_group <- data_trend %>%
+  distinct(Subject.Number, Group, Age) %>%
+  rename(Subject = Subject.Number)
+
+data_vert_r2 <- left_join(data_vert, subject_group, by = "Subject")
+data_vert_r2$R2_weight <- data_vert_r2$Variance.Explained
+rows_to_remove <- (data_vert_r2$Subject == "sub-38" & data_vert_r2$Visual.Area %in% c("V1", "V2","V3", "V4", "LO"))
+data_vert_completed <- data_vert_r2# [!rows_to_remove, ]
+data_vert_completed$Visual.Area <- factor(data_vert_completed$Visual.Area, levels = c("V1", "V2", "V3", "V4", "LO"))
+```
+
+# Age and sex differences test
+```{r}
+# Get only one row per subject, instead than four 
+one_row_per_person <- data_trend %>% distinct(Subject.Number, .keep_all = TRUE)
+# Keep all to keep all the columns and to get the correct groups as well. 
+# table(one_row_per_person$Group)
+
+age_test <- t.test(Age ~ Group, data = one_row_per_person) # Some script use also var.equal = TRUE.
+age_test
+
+sex_table <- table(one_row_per_person$Group, one_row_per_person$Gender)
+sex_test <- chisq.test(sex_table) # Some script use also correct = FALSE.
+sex_test
+```
+
+```{r}
+# SIZE MODEL not weighted by variance explained 
+model_size <- lmer(
+  Size ~ Group * Eccentricity + Group * Visual.Area + Eccentricity * Visual.Area +
+    (1 | Subject) + (1 + Eccentricity | Subject:Visual.Area), 
+  data = data_vert_completed)
+
+summary(model_size)
+anova(model_size) 
+```
+
+```{r}
+# Compare Glaucoma vs Controls separately for each Visual Area
+emm_groupxarea <- emmeans(model_size, pairwise ~ Group | Visual.Area)
+emm_groupxarea$emmeans   # average pRF size for each Group, in each Visual Area
+emm_groupxarea$contrasts # difference (Glaucoma vs Controls) in each Visual Area
+
+emm_df <- as.data.frame(emm_groupxarea$contrasts) # Turn the results into a normal data frame we can work with
+emm_df$Visual.Area <- factor(emm_df$Visual.Area, levels = c("V1", "V2", "V3", "V4", "LO"))
+emm_df <- emm_df[order(emm_df$Visual.Area), ]
+
+emm_df$p.raw <- emm_df$p.value # Save the original, uncorrected p-values so we can compare later
+emm_df$p.bonf.all5 <- p.adjust(emm_df$p.value, method = "bonferroni") # Correct for testing ALL 5 areas
+emm_df$p.bonf.v4lo <- emm_df$p.raw # Correct for V4 and LO
+v4_row <- emm_df$Visual.Area == "V4"
+lo_row <- emm_df$Visual.Area == "LO"
+both_p <- c(emm_df$p.value[v4_row], emm_df$p.value[lo_row])
+both_p_corrected <- p.adjust(both_p, method = "bonferroni")
+emm_df$p.bonf.v4lo[v4_row] <- both_p_corrected[1]
+emm_df$p.bonf.v4lo[lo_row] <- both_p_corrected[2]
+
+# Add a simple "yes/no significant" label for each correction method
+emm_df$sig.all5 <- ifelse(emm_df$p.bonf.all5 < 0.05, "Significant (p.bonf < .05)", "Not significant")
+emm_df$sig.v4lo <- ifelse(emm_df$p.bonf.v4lo < 0.05, "Significant (p.bonf < .05)", "Not significant")
+
+# Corrected for all 5 areas
+p_all5 <- ggplot(emm_df, aes(x = estimate, y = Visual.Area, color = sig.all5)) +
+  geom_point(size = 3) + # dot = the estimated difference
+  geom_errorbarh(aes(xmin = estimate - SE, xmax = estimate + SE), height = 0, linewidth = 0.8) + # line = standard error
+  geom_vline(xintercept = 0, linetype = "dashed") + # dashed line = no difference
+  geom_text(
+    data = emm_df %>% filter(sig.all5 == "Significant (p.bonf < .05)"),
+    aes(x = estimate, y = Visual.Area, label = sprintf("p = %.3f", p.bonf.all5)),
+    color = "red", vjust = -0.8, size = 4, inherit.aes = FALSE) +
+  scale_color_manual(values = c("Significant (p.bonf < .05)" = "red", "Not significant" = "grey50")) +
+  labs(
+    x = "Estimate (HC - POAG)", y = "Visual area",
+    color = NULL,
+    title = "Model-estimated difference corrected V1-LO"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(panel.grid.minor = element_blank(), legend.position = "top")
+p_all5
+ggsave(filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", "BNF_V1LO.pdf"),
+       plot = p_all5 + theme(aspect.ratio = 1), width = 6, height = 6, dpi = 300, device = "pdf")
+
+# Corrected for just V4 and LO
+p_v4lo <- ggplot(emm_df, aes(x = estimate, y = Visual.Area, color = sig.v4lo)) +
+  geom_point(size = 3) +
+  geom_errorbarh(aes(xmin = estimate - SE, xmax = estimate + SE), height = 0, linewidth = 0.8) +
+  geom_text(
+    data = emm_df %>% filter(sig.v4lo == "Significant (p.bonf < .05)"),
+    aes(x = estimate, y = Visual.Area, label = sprintf("p = %.3f", p.bonf.v4lo)),
+    color = "red", vjust = -0.8, size = 4, inherit.aes = FALSE) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  scale_color_manual(values = c("Significant (p.bonf < .05)" = "red", "Not significant" = "grey50")) +
+  labs(
+    x = "Estimate (HC - POAG)", y = "Visual area",
+    color = NULL,
+    title = "Model-estimated difference corrected V4-LO"
+  ) +
+  theme_bw(base_size = 13) +
+  theme(panel.grid.minor = element_blank(), legend.position = "top")
+p_v4lo
+ggsave(filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", "BNF_V4LO.pdf"),
+       plot = p_v4lo + theme(aspect.ratio = 1), width = 6, height = 6, dpi = 300, device = "pdf")
+
+# Print p-values: raw, corrected for V4+LO only, and corrected for all 5 areas
+p_values_table <- emm_df[, c("Visual.Area","p.raw", "p.bonf.v4lo", "p.bonf.all5")]
+print(p_values_table)
+```
+
+```{r}
+# Create a data frame to store the predictions at eccentricity 3.5
+newdata_3.5 <- unique(data_vert_completed[, c("Subject", "Group", "Visual.Area")])
+newdata_3.5$Eccentricity <- 3.5 # Add a column with the eccentricity value 
+
+# Predict the pRF size based on the model for the eccentricity 3.5 
+newdata_3.5$pred_size <- predict(model_size, newdata = newdata_3.5)
+# newdata_3.5 # Subject - Group - Area - Eccentricity 3.5 - Predicted size
+group_mean <- as.data.frame(
+  emmeans(model_size, ~ Group | Visual.Area, at = list(Eccentricity = 3.5))
+) %>% rename(mean_size = emmean)
+
+# Build the subjects specific trend lines across eccentricity range 
+ecc_range <- seq(min(data_vert_completed$Eccentricity), max(data_vert_completed$Eccentricity), length.out = 30)
+# ecc_range # 0.5000116 till 6.4999939
+# Create a data frame to store the predictions at eccentricity the 30 different eccentricities 
+subj_lines <- unique(data_vert_completed[, c("Subject", "Group", "Visual.Area")]) %>%
+  tidyr::crossing(Eccentricity = ecc_range)
+subj_lines$pred_size <- predict(model_size, newdata = subj_lines)
+# subj_lines # Subject - Group - Area - 30 different eccentricities - Predicted size
+
+# Get the estimated marginal mean pRF size for both groups and 30 eccentricities for each visual area. 
+group_line <- emmeans(model_size, ~ Group + Eccentricity | Visual.Area, at = list(Eccentricity = ecc_range))
+# group_line # Visual area - Group - pRF size emmean at that eccentricity - SE - Lower Confidence Limit - Upper Confidence Limit they are already computed within the emmeans.
+group_line_df <- as.data.frame(group_line) # Get a data frame to be able to plot it
+# group_line_df
+```
+
+```{r}
+group_labels <- c("Controls" = "HC (N=21)", "Glaucoma" = "POAG (N=18)")
+group_colors <- c("Controls" = "#1f77b4", "Glaucoma" = "#d62728")  
+areas <- levels(data_vert_completed$Visual.Area)  # c("V1", "V2", "V3", "V4", "LO")
+
+for (area in areas) {
+  # Get p-value for this area (bonferroni corrected for V4 and LO, raw for others)
+  p_val <- emm_df$p.bonf.v4lo[emm_df$Visual.Area == area]
+  sig_label <- ifelse(p_val < 0.05, sprintf("p = %.3f", p_val), "n.s.")
+  
+  # Position asterisk just above the highest group mean dot
+  area_means <- group_mean %>% filter(Visual.Area == area)
+  asterisk_y <- max(area_means$mean_size) + 0.15
+
+  p <- ggplot() +
+    geom_line(data = subj_lines %>% filter(Visual.Area == area),
+              aes(x = Eccentricity, y = pred_size, group = Subject, color = Group),
+              alpha = 0.35) +
+    geom_ribbon(data = group_line_df %>% filter(Visual.Area == area),
+                aes(x = Eccentricity, ymin = asymp.LCL, ymax = asymp.UCL, fill = Group),
+                alpha = 0.25, inherit.aes = FALSE) +
+    geom_line(data = group_line_df %>% filter(Visual.Area == area),
+              aes(x = Eccentricity, y = emmean, color = Group),
+              linewidth = 1.2) +
+    geom_point(data = area_means,
+               aes(x = 3.5, y = mean_size, color = Group),
+               size = 3, shape = 16,
+               position = position_dodge(width = 0.1)) +
+    # Asterisk above the dots 
+    { if (p_val < 0.05) annotate("text", x = 3.5, y = asterisk_y, label = "*", size = 12) } +
+    # Significance label bottom right
+    annotate("text", x = 6.8, y = 0.2, label = sig_label, hjust = 1, size = 7) +
+    scale_color_manual(values = group_colors, labels = group_labels) +
+    scale_fill_manual(values = group_colors, labels = group_labels) +
+    scale_x_continuous(breaks = 0:7, limits = c(0, 7), expand = c(0, 0)) +
+    scale_y_continuous(breaks = 0:4, limits = c(0, 4), expand = c(0, 0)) +
+    labs(
+      x = "pRF Eccentricity (deg)",
+      y = "Model-estimated pRF size (deg)",
+      title = paste("Visual area", area),
+      color = NULL, fill = NULL) +
+    theme_bw(base_size = 13) +
+    theme(
+      panel.grid.minor = element_blank(),
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+      axis.title.x = element_text(size = 16),
+      axis.title.y = element_text(size = 16),
+      axis.text = element_text(size = 12),
+      legend.position = if (area == "V1") c(0.20, 0.90) else "none",
+      legend.background = element_rect(fill = alpha("white", 0.6), color = "grey", linewidth = 0.2),
+      legend.text = element_text(size = 14))
+  ggsave( filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", paste0("pRF_size_", area, ".pdf")),
+    plot = p + theme(aspect.ratio = 1), width = 6, height = 6, dpi = 300, device = "pdf")}
+```
+
+```{r}
+hfa_col <- "HFA.Average"
+oct_col <- "OCT.Average"
+
+demo <- data_trend %>%
+  distinct(Subject.Number, .keep_all = TRUE) %>%
+  rename(Subject = Subject.Number)
+
+# HFA boxplot
+p_hfa <- ggplot(demo, aes(x = Group, y = .data[[hfa_col]], fill = Group)) +
+  geom_boxplot(alpha = 0.6, width = 0.5) +
+  geom_jitter(aes(fill = Group), color = "black", width = 0.12, size = 3.5, alpha = 0.7, shape = 21, stroke = 0.8) +
+  scale_fill_manual(values = group_colors, labels = group_labels) +
+  scale_x_discrete(labels = c("Controls" = "HC", "Glaucoma" = "POAG")) +
+  labs(title = "HFA Average", x = NULL, y = "HFA Average (dB)") +
+  theme_bw(base_size = 13) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.y = element_text(size = 16),
+    axis.text = element_text(size = 14),
+    legend.position = c(0.20, 0.13),
+    legend.title = element_blank(),
+    legend.background = element_rect(fill = alpha("white", 0.6), color = "grey", linewidth = 0.2),
+    legend.text = element_text(size = 14))
+
+print(p_hfa)
+ggsave(filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", "HFA_boxplot.pdf"),
+       plot = p_hfa + theme(aspect.ratio = 1), width = 6, height = 6, dpi = 300, device = "pdf")
+
+# OCT boxplot
+p_oct <- ggplot(demo, aes(x = Group, y = .data[[oct_col]], fill = Group)) +
+  geom_boxplot(alpha = 0.6, width = 0.5) +
+  geom_jitter(aes(fill = Group), color = "black", width = 0.12, size = 3.5, alpha = 0.7, shape = 21, stroke = 0.8) +
+  scale_fill_manual(values = group_colors, labels = group_labels) +
+  scale_x_discrete(labels = c("Controls" = "HC", "Glaucoma" = "POAG")) +
+  labs(title = "OCT RNFL Thickness", x = NULL, y = "RNFL Average (µm)") +
+  theme_bw(base_size = 13) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.y = element_text(size = 16),
+    axis.text = element_text(size = 14),
+    legend.title = element_blank(),
+    legend.position = c(0.20, 0.13),
+    legend.background = element_rect(fill = alpha("white", 0.6), color = "grey", linewidth = 0.2),
+    legend.text = element_text(size = 14))
+
+print(p_oct)
+ggsave(filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", "OCT_boxplot.pdf"),
+       plot = p_oct + theme(aspect.ratio = 1), width = 6, height = 6, dpi = 300, device = "pdf")
+
+print(p_hfa)
+print(p_oct)
+```
+
+```{r}
+# Keep only V4 and merge with clinical data
+v4_size <- newdata_3.5 %>%
+  filter(Visual.Area == "V4") %>%
+  select(Subject, Group, pred_size)
+
+corr_data <- left_join(v4_size, demo %>% select(Subject, all_of(c(hfa_col, oct_col))), by = "Subject")
+
+# Run normality and correlations on glaucoma patients only
+corr_glaucoma <- corr_data %>% filter(Group == "Glaucoma")
+shapiro.test(corr_glaucoma$pred_size)
+shapiro.test(corr_glaucoma[[hfa_col]])
+shapiro.test(corr_glaucoma[[oct_col]])
+
+corr_method <- "spearman"
+
+# Correlation with HFA (glaucoma only)
+ct_hfa <- cor.test(corr_glaucoma$pred_size, corr_glaucoma[[hfa_col]], method = corr_method)
+ct_hfa
+
+p_corr_hfa <- ggplot(corr_data, aes(x = .data[[hfa_col]], y = pred_size, fill = Group)) +
+  geom_point(size = 3.5, shape = 21, color = "black", stroke = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, aes(color = Group)) +
+  scale_color_manual(values = group_colors, labels = group_labels, guide = "none") +
+  scale_fill_manual(values = group_colors, labels = group_labels) +
+  labs(title = "Visual area V4",
+       x = "HFA Average (dB)", y = "Model-estimated pRF size (deg)", fill = NULL) +
+  theme_bw(base_size = 13) +
+  guides(fill = guide_legend(override.aes = list(shape = 21, size = 3.5, color = "black", stroke = 0.8))) +
+  annotate("text", x = Inf, y = -Inf, hjust = 1.1, vjust = -0.5, label = "n.s.", size = 7) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text = element_text(size = 12),
+    legend.title = element_blank(),
+    legend.position = c(0.20, 0.13),
+    legend.background = element_rect(fill = alpha("white", 0.6), color = "grey", linewidth = 0.2),
+    legend.text = element_text(size = 14))
+
+print(p_corr_hfa)
+ggsave(filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", "corr_V4_HFA.pdf"),
+       plot = p_corr_hfa + theme(aspect.ratio = 1), width = 6, height = 6, dpi = 300, device = "pdf")
+
+ct_oct <- cor.test(corr_glaucoma$pred_size, corr_glaucoma[[oct_col]], method = corr_method)
+ct_oct
+
+p_corr_oct <- ggplot(corr_data, aes(x = .data[[oct_col]], y = pred_size, fill = Group)) +
+  geom_point(size = 3.5, shape = 21, color = "black", stroke = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, aes(color = Group)) +
+  scale_color_manual(values = group_colors, labels = group_labels, guide = "none") +
+  scale_fill_manual(values = group_colors, labels = group_labels) +
+  labs(title = "Visual area V4",
+       x = "pRNFL Average (µm)", y = "Model-estimated pRF size (deg)", fill = NULL) +
+  theme_bw(base_size = 13) +
+  guides(fill = guide_legend(override.aes = list(shape = 21, size = 3.5, color = "black", stroke = 0.8))) +
+  annotate("text", x = Inf, y = -Inf, hjust = 1.1, vjust = -0.5, label = "n.s.", size = 7) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text = element_text(size = 12),
+    legend.title = element_blank(),
+    legend.position = c(0.20, 0.13),
+    legend.background = element_rect(fill = alpha("white", 0.6), color = "grey", linewidth = 0.2),
+    legend.text = element_text(size = 14))
+
+print(p_corr_oct)
+ggsave(filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", "corr_V4_OCT.pdf"),
+       plot = p_corr_oct + theme(aspect.ratio = 1), width = 6, height = 6, dpi = 300, device = "pdf")
+```
+
+
+
+```{r}
+# Keep only LO and merge with clinical data
+lo_size <- newdata_3.5 %>%
+  filter(Visual.Area == "LO") %>%
+  select(Subject, Group, pred_size)
+corr_data_lo <- left_join(lo_size, demo %>% select(Subject, all_of(c(hfa_col, oct_col))), by = "Subject")
+
+# Run normality and correlations on glaucoma patients only
+corr_glaucoma_lo <- corr_data_lo %>% filter(Group == "Glaucoma")
+shapiro.test(corr_glaucoma_lo$pred_size)
+shapiro.test(corr_glaucoma_lo[[hfa_col]])
+shapiro.test(corr_glaucoma_lo[[oct_col]])
+
+# Correlation with HFA (glaucoma only)
+ct_hfa_lo <- cor.test(corr_glaucoma_lo$pred_size, corr_glaucoma_lo[[hfa_col]], method = corr_method)
+ct_hfa_lo
+
+p_corr_hfa_lo <- ggplot(corr_data_lo, aes(x = .data[[hfa_col]], y = pred_size, fill = Group)) +
+  geom_point(size = 3.5, shape = 21, color = "black", stroke = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, aes(color = Group)) +
+  scale_color_manual(values = group_colors, labels = group_labels, guide = "none") +
+  scale_fill_manual(values = group_colors, labels = group_labels) +
+  labs(title = "Visual area LO",
+       x = "HFA Average (dB)", y = "Model-estimated pRF size (deg)", fill = NULL) +
+  theme_bw(base_size = 13) +
+  guides(fill = guide_legend(override.aes = list(shape = 21, size = 3.5, color = "black", stroke = 0.8))) +
+  annotate("text", x = Inf, y = -Inf, hjust = 1.1, vjust = -0.5, label = "n.s.", size = 7) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text = element_text(size = 12),
+    legend.title = element_blank(),
+    legend.position = c(0.20, 0.13),
+    legend.background = element_rect(fill = alpha("white", 0.6), color = "grey", linewidth = 0.2),
+    legend.text = element_text(size = 14))
+print(p_corr_hfa_lo)
+ggsave(filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", "corr_LO_HFA.pdf"),
+       plot = p_corr_hfa_lo + theme(aspect.ratio = 1), width = 6, height = 6, dpi = 300, device = "pdf")
+
+# Correlation with OCT (glaucoma only)
+ct_oct_lo <- cor.test(corr_glaucoma_lo$pred_size, corr_glaucoma_lo[[oct_col]], method = corr_method)
+ct_oct_lo
+
+p_corr_oct_lo <- ggplot(corr_data_lo, aes(x = .data[[oct_col]], y = pred_size, fill = Group)) +
+  geom_point(size = 3.5, shape = 21, color = "black", stroke = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, aes(color = Group)) +
+  scale_color_manual(values = group_colors, labels = group_labels, guide = "none") +
+  scale_fill_manual(values = group_colors, labels = group_labels) +
+  labs(title = "Visual area LO",
+       x = "pRNFL Average (µm)", y = "Model-estimated pRF size (deg)", fill = NULL) +
+  theme_bw(base_size = 13) +
+  guides(fill = guide_legend(override.aes = list(shape = 21, size = 3.5, color = "black", stroke = 0.8))) +
+  annotate("text", x = Inf, y = -Inf, hjust = 1.1, vjust = -0.5, label = "n.s.", size = 7) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text = element_text(size = 12),
+    legend.title = element_blank(),
+    legend.position = c(0.20, 0.13),
+    legend.background = element_rect(fill = alpha("white", 0.6), color = "grey", linewidth = 0.2),
+    legend.text = element_text(size = 14))
+print(p_corr_oct_lo)
+ggsave(filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", "corr_LO_OCT.pdf"),
+       plot = p_corr_oct_lo + theme(aspect.ratio = 1), width = 6, height = 6, dpi = 300, device = "pdf")
+```
+
+```{r}
+# Get one mean pRF size per subject per visual area (averaging across eccentricities)
+subj_area_mean <- data_vert_completed %>%
+  group_by(Subject, Group, Visual.Area) %>%
+  summarise(mean_size = mean(Size, na.rm = TRUE), .groups = "drop")
+
+# Check normality per visual area
+for (area in areas) {
+  values <- subj_area_mean$mean_size[subj_area_mean$Visual.Area == area]
+  print(shapiro.test(values))}
+
+# Boxplot per visual area
+p_raw_size <- ggplot(subj_area_mean, aes(x = Visual.Area, y = mean_size, fill = Group)) +
+  geom_boxplot(alpha = 0.6, width = 0.5, position = position_dodge(width = 0.7)) +
+  geom_jitter(aes(fill = Group), color = "black", shape = 21, stroke = 0.8,
+              size = 3, alpha = 0.7,
+              position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.7)) +
+  scale_fill_manual(values = group_colors, labels = group_labels) +
+  labs(title = "pRF size by visual area",
+       x = "Visual area", y = "Median pRF size (deg)", fill = NULL) +
+  theme_bw(base_size = 13) +
+  guides(fill = guide_legend(override.aes = list(shape = 21, size = 3.5, color = "black", stroke = 0.8))) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text = element_text(size = 12),
+    legend.title = element_blank(),
+    legend.position = c(0.15, 0.88),
+    legend.background = element_rect(fill = alpha("white", 0.6), color = "grey", linewidth = 0.2),
+    legend.text = element_text(size = 14))
+
+print(p_raw_size)
+ggsave(filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", "size_boxplot.pdf"),
+       plot = p_raw_size + theme(aspect.ratio = 0.7), width = 8, height = 6, dpi = 300, device = "pdf")
+```
+```{r}
+# VARIANCE EXPLAINED weighted by variance explained 
+model_ve_w <- lmer(
+  Variance.Explained ~ Group * Eccentricity + Group * Visual.Area + Eccentricity * Visual.Area +
+    (1 | Subject) + (1 + Eccentricity | Subject:Visual.Area), 
+  data = data_vert_completed)
+
+summary(model_ve_w)
+anova(model_ve_w)
+
+# Boxplot per visual area
+# Get one mean variance explained per subject per visual area
+subj_area_ve <- data_vert_completed %>%
+  group_by(Subject, Group, Visual.Area) %>%
+  summarise(mean_ve = mean(Variance.Explained, na.rm = TRUE), .groups = "drop")
+
+# Check normality per visual area
+for (area in areas) {
+  values <- subj_area_ve$mean_ve[subj_area_ve$Visual.Area == area]
+  print(shapiro.test(values))
+}
+
+# Boxplot per visual area
+p_raw_ve <- ggplot(subj_area_ve, aes(x = Visual.Area, y = mean_ve, fill = Group)) +
+  geom_boxplot(alpha = 0.6, width = 0.5, position = position_dodge(width = 0.7)) +
+  geom_jitter(aes(fill = Group), color = "black", shape = 21, stroke = 0.8,
+              size = 3.5, alpha = 0.7,
+              position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.7)) +
+  scale_fill_manual(values = group_colors, labels = group_labels) +
+  labs(title = "Variance Explained by visual area",
+       x = "Visual area", y = "Median variance explained", fill = NULL) +
+  theme_bw(base_size = 13) +
+  guides(fill = guide_legend(override.aes = list(shape = 21, size = 3.5, color = "black", stroke = 0.8))) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16),
+    axis.text = element_text(size = 12),
+    legend.title = element_blank(),
+    legend.position = c(0.15, 0.10),
+    legend.background = element_rect(fill = alpha("white", 0.6), color = "grey", linewidth = 0.2),
+    legend.text = element_text(size = 14))
+
+print(p_raw_ve)
+ggsave(filename = file.path("/Users/federicacardillo/Desktop/PHD/pRF/paper_figures", "ve_boxplot.pdf"),
+       plot = p_raw_ve + theme(aspect.ratio = 0.7), width = 8, height = 6, dpi = 300, device = "pdf")
+```
